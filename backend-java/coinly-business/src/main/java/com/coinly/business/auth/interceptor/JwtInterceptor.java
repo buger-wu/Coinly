@@ -11,9 +11,14 @@ import org.springframework.web.servlet.HandlerInterceptor;
  * JWT 鉴权拦截器。
  * @see JwtUtils
  * @see UserContext
- * @see com.coinly.config.WebMvcConfig
  */
 public class JwtInterceptor implements HandlerInterceptor {
+
+    private final JwtUtils jwtUtils;
+
+    public JwtInterceptor(JwtUtils jwtUtils) {
+        this.jwtUtils = jwtUtils;
+    }
 
     @Override
     public boolean preHandle(HttpServletRequest request, HttpServletResponse response, Object handler) {
@@ -24,12 +29,12 @@ public class JwtInterceptor implements HandlerInterceptor {
 
         // 去掉 "Bearer " 前缀，获取纯 Token
         token = token.substring(7);
-        if (!JwtUtils.isValidToken(token)) {
+        if (!jwtUtils.isValidToken(token)) {
             throw new BusinessException(401, "Token无效或已过期");
         }
 
         // 解析用户 ID 并存入 ThreadLocal，供业务代码使用
-        Long userId = JwtUtils.parseUserId(token);
+        Long userId = jwtUtils.parseUserId(token);
         UserContext.setUserId(userId);
 
         return true;

@@ -64,4 +64,32 @@ public interface TransactionMapper extends BaseMapper<TransactionEntity> {
      * @param totalAmount 金额合计
      */
     record CategoryAmountDTO(String name, BigDecimal totalAmount) {}
+
+    /**
+     * 按账本汇总收支余额（用于账本余额汇总接口）。
+     *
+     * <p>一条 SQL 查出用户所有账本的总收入、总支出，余额 = 收入 - 支出。
+     * 统计全部历史数据（非按月），排除已删除记录。
+     *
+     * @param userId 用户 ID
+     * @return 账本 ID + 账本名称 + 总收入 + 总支出列表
+     */
+    @Select("SELECT b.id as book_id, b.name as book_name, " +
+            "COALESCE(SUM(CASE WHEN t.type = 1 THEN t.amount ELSE 0 END), 0) as total_income, " +
+            "COALESCE(SUM(CASE WHEN t.type = 0 THEN t.amount ELSE 0 END), 0) as total_expense " +
+            "FROM biz_book b " +
+            "LEFT JOIN biz_transaction t ON b.id = t.book_id AND t.deleted = 0 " +
+            "WHERE b.user_id = #{userId} AND b.deleted = 0 " +
+            "GROUP BY b.id, b.name ORDER BY b.id")
+    List<BookBalanceDTO> sumBalanceByBook(@Param("userId") Long userId);
+
+    /**
+     * 账本余额汇总 DTO（用于 {@link #sumBalanceByBook} 返回值）。
+     *
+     * @param bookId       账本 ID
+     * @param bookName     账本名称
+     * @param totalIncome  总收入
+     * @param totalExpense 总支出
+     */
+    record BookBalanceDTO(Long bookId, String bookName, BigDecimal totalIncome, BigDecimal totalExpense) {}
 }

@@ -3,6 +3,7 @@ package com.coinly.business.statistics.controller;
 import com.coinly.business.statistics.dto.CategoryStatDTO;
 import com.coinly.business.statistics.dto.MonthlySummaryDTO;
 import com.coinly.business.statistics.service.StatisticsService;
+import com.coinly.business.transaction.mapper.TransactionMapper;
 import com.coinly.common.context.UserContext;
 import com.coinly.common.domain.CommonResponse;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -45,5 +46,35 @@ public class StatisticsController {
         Long userId = UserContext.getUserId();
         List<Map<String, Object>> trend = statisticsService.getYearlyTrend(userId, bookId, year);
         return CommonResponse.success(trend);
+    }
+
+    /**
+     * 近N个月收支趋势（支持跨年）。
+     *
+     * @param bookId 账本 ID，可选，不传时汇总所有账本
+     * @param months 近几个月，默认6
+     * @return 每月 month/income/expense，按月份正序
+     */
+    @GetMapping("/recent-trend")
+    public CommonResponse<List<Map<String, Object>>> getRecentTrend(@RequestParam(required = false) Long bookId,
+                                                                     @RequestParam(defaultValue = "6") int months) {
+        Long userId = UserContext.getUserId();
+        List<Map<String, Object>> trend = statisticsService.getRecentTrend(userId, bookId, months);
+        return CommonResponse.success(trend);
+    }
+
+    /**
+     * 账本余额汇总。
+     *
+     * <p>返回用户所有账本的总收入、总支出、余额（收入-支出）。
+     * 统计全部历史数据，排除已删除记录。
+     *
+     * @return 各账本余额列表
+     */
+    @GetMapping("/balances")
+    public CommonResponse<List<TransactionMapper.BookBalanceDTO>> getBookBalances() {
+        Long userId = UserContext.getUserId();
+        List<TransactionMapper.BookBalanceDTO> balances = statisticsService.getBookBalances(userId);
+        return CommonResponse.success(balances);
     }
 }

@@ -35,3 +35,13 @@ mybatis-plus:
     log-impl: org.apache.ibatis.logging.stdout.StdOutImpl
   global-config:
     banner: false
+
+# JWT 配置
+jwt:
+  secret-key: coinly-secret-key-for-jwt-token-generation-2024
+  expiration: 604800000  # 7天（毫秒）
+
+# CORS 配置
+cors:
+  allowed-origins:
+    - http://localhost:5173

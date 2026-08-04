@@ -28,3 +28,13 @@ mybatis-plus:
     map-underscore-to-camel-case: true
   global-config:
     banner: false
+
+# JWT 配置（生产环境建议通过环境变量覆盖：JWT_SECRET_KEY）
+jwt:
+  secret-key: ${JWT_SECRET_KEY:coinly-secret-key-for-jwt-token-generation-2024}
+  expiration: 604800000  # 7天（毫秒）
+
+# CORS 配置（生产环境建议通过环境变量覆盖：CORS_ALLOWED_ORIGINS）
+cors:
+  allowed-origins:
+    - ${CORS_ALLOWED_ORIGIN:http://localhost:5173}

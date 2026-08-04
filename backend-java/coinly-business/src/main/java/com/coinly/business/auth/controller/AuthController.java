@@ -11,6 +11,8 @@ import com.coinly.business.user.service.UserService;
 import com.coinly.common.domain.CommonResponse;
 import com.coinly.common.exception.BusinessException;
 import com.coinly.common.util.JwtUtils;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.transaction.annotation.Transactional;
@@ -26,6 +28,7 @@ import java.time.LocalDateTime;
  *
  * @see com.coinly.business.category.service.CategoryService#initDefaultCategories(Long)
  */
+@Tag(name = "认证模块")
 @RestController
 @RequestMapping("/v1/auth")
 public class AuthController {
@@ -34,12 +37,14 @@ public class AuthController {
     private final BookService bookService;
     private final CategoryService categoryService;
     private final BCryptPasswordEncoder passwordEncoder;
+    private final JwtUtils jwtUtils;
 
-    public AuthController(UserService userService, BookService bookService, CategoryService categoryService, BCryptPasswordEncoder passwordEncoder) {
+    public AuthController(UserService userService, BookService bookService, CategoryService categoryService, BCryptPasswordEncoder passwordEncoder, JwtUtils jwtUtils) {
         this.userService = userService;
         this.bookService = bookService;
         this.categoryService = categoryService;
         this.passwordEncoder = passwordEncoder;
+        this.jwtUtils = jwtUtils;
     }
 
     /**
@@ -51,6 +56,7 @@ public class AuthController {
      * @return 用户信息 + JWT Token
      * @throws BusinessException 用户名已存在时抛出
      */
+    @Operation(summary = "用户注册")
     @PostMapping("/register")
     @Transactional
     public CommonResponse<LoginResponse> register(@Valid @RequestBody RegisterRequest request) {
@@ -82,7 +88,7 @@ public class AuthController {
         categoryService.initDefaultCategories(user.getId());
 
         // 5. 生成 JWT Token 返回
-        String token = JwtUtils.generateToken(user.getId());
+        String token = jwtUtils.generateToken(user.getId());
         return CommonResponse.success(new LoginResponse(user.getId(), user.getUsername(), user.getNickname(), token));
     }
 
@@ -95,6 +101,7 @@ public class AuthController {
      * @return 用户信息 + JWT Token
      * @throws BusinessException 用户名或密码错误时抛出
      */
+    @Operation(summary = "用户登录")
     @PostMapping("/login")
     public CommonResponse<LoginResponse> login(@Valid @RequestBody LoginRequest request) {
         UserEntity user = userService.lambdaQuery()
@@ -106,7 +113,7 @@ public class AuthController {
             throw new BusinessException("用户名或密码错误");
         }
 
-        String token = JwtUtils.generateToken(user.getId());
+        String token = jwtUtils.generateToken(user.getId());
         return CommonResponse.success(new LoginResponse(user.getId(), user.getUsername(), user.getNickname(), token));
     }
 }

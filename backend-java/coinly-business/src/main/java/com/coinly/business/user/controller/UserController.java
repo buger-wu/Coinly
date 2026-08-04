@@ -11,8 +11,11 @@ import jakarta.validation.Valid;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.web.bind.annotation.*;
 
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import java.time.LocalDateTime;
 
+@Tag(name = "用户模块")
 @RestController
 @RequestMapping("/v1/user")
 public class UserController {
@@ -25,6 +28,7 @@ public class UserController {
         this.passwordEncoder = passwordEncoder;
     }
 
+    @Operation(summary = "获取个人信息")
     @GetMapping("/profile")
     public CommonResponse<UserEntity> getProfile() {
         Long userId = UserContext.getUserId();
@@ -35,6 +39,7 @@ public class UserController {
         return CommonResponse.success(user);
     }
 
+    @Operation(summary = "修改基本信息")
     @PutMapping("/profile")
     public CommonResponse<Void> updateProfile(@Valid @RequestBody UpdateProfileRequest request) {
         Long userId = UserContext.getUserId();
@@ -55,6 +60,7 @@ public class UserController {
         return CommonResponse.success("修改成功", null);
     }
 
+    @Operation(summary = "修改密码")
     @PutMapping("/password")
     public CommonResponse<Void> updatePassword(@Valid @RequestBody UpdatePasswordRequest request) {
         Long userId = UserContext.getUserId();

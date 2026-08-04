@@ -110,4 +110,52 @@ public class StatisticsServiceImpl implements StatisticsService {
 
         return trend;
     }
+
+    /**
+     * 近N个月收支趋势（支持跨年）。
+     *
+     * <p>从当前月份往前推 N 个月，每月统计收入和支出。
+     * 与 yearly 不同，此方法支持跨年场景（如当前8月，近6个月为3-8月）。
+     *
+     * @param userId 用户 ID
+     * @param bookId 账本 ID，null 表示所有账本汇总
+     * @param months 近几个月
+     * @return 每月 month/income/expense，按月份正序
+     */
+    @Override
+    public List<Map<String, Object>> getRecentTrend(Long userId, Long bookId, int months) {
+        YearMonth currentMonth = YearMonth.now();
+        List<Map<String, Object>> trend = new ArrayList<>();
+
+        for (int i = months - 1; i >= 0; i--) {
+            YearMonth ym = currentMonth.minusMonths(i);
+            LocalDate start = ym.atDay(1);
+            LocalDate end = ym.atEndOfMonth();
+
+            BigDecimal income = transactionMapper.sumByType(userId, bookId, 1, start, end);
+            BigDecimal expense = transactionMapper.sumByType(userId, bookId, 0, start, end);
+
+            Map<String, Object> item = new HashMap<>();
+            item.put("month", ym.toString());
+            item.put("income", income != null ? income : BigDecimal.ZERO);
+            item.put("expense", expense != null ? expense : BigDecimal.ZERO);
+            trend.add(item);
+        }
+
+        return trend;
+    }
+
+    /**
+     * 账本余额汇总。
+     *
+     * <p>一条 SQL 查出用户所有账本的总收入和总支出，余额 = 收入 - 支出。
+     * 统计全部历史数据（非按月），排除已删除记录。
+     *
+     * @param userId 用户 ID
+     * @return 各账本的 bookId/bookName/totalIncome/totalExpense 列表
+     */
+    @Override
+    public List<TransactionMapper.BookBalanceDTO> getBookBalances(Long userId) {
+        return transactionMapper.sumBalanceByBook(userId);
+    }
 }

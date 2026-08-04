@@ -17,9 +17,12 @@ import com.coinly.common.exception.BusinessException;
 import jakarta.validation.Valid;
 import org.springframework.web.bind.annotation.*;
 
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 
+@Tag(name = "交易模块")
 @RestController
 @RequestMapping("/v1/books/{bookId}/transactions")
 public class TransactionController {
@@ -34,6 +37,7 @@ public class TransactionController {
         this.categoryService = categoryService;
     }
 
+    @Operation(summary = "新增交易")
     @PostMapping
     public CommonResponse<TransactionEntity> createTransaction(@PathVariable Long bookId,
                                                                @Valid @RequestBody CreateTransactionRequest request) {
@@ -70,6 +74,7 @@ public class TransactionController {
         return CommonResponse.success(transaction);
     }
 
+    @Operation(summary = "交易列表（分页+筛选）")
     @GetMapping
     public CommonResponse<PageResponse<TransactionEntity>> getTransactionList(@PathVariable Long bookId,
                                                                                @RequestParam(defaultValue = "1") int page,
@@ -80,6 +85,7 @@ public class TransactionController {
         return CommonResponse.success(PageResponse.of(result.getRecords(), result.getTotal(), page, size));
     }
 
+    @Operation(summary = "交易详情")
     @GetMapping("/{id}")
     public CommonResponse<TransactionEntity> getTransactionById(@PathVariable Long bookId, @PathVariable Long id) {
         Long userId = UserContext.getUserId();
@@ -95,6 +101,7 @@ public class TransactionController {
         return CommonResponse.success(transaction);
     }
 
+    @Operation(summary = "编辑交易")
     @PutMapping("/{id}")
     public CommonResponse<Void> updateTransaction(@PathVariable Long bookId, @PathVariable Long id,
                                                   @Valid @RequestBody UpdateTransactionRequest request) {
@@ -130,6 +137,7 @@ public class TransactionController {
         return CommonResponse.success("修改成功", null);
     }
 
+    @Operation(summary = "删除交易")
     @DeleteMapping("/{id}")
     public CommonResponse<Void> deleteTransaction(@PathVariable Long bookId, @PathVariable Long id) {
         Long userId = UserContext.getUserId();

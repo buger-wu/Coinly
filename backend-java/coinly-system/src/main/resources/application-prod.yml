@@ -38,3 +38,15 @@ jwt:
 cors:
   allowed-origins:
     - ${CORS_ALLOWED_ORIGIN:http://localhost:5173}
+
+# Knife4j 配置
+springdoc:
+  swagger-ui:
+    path: /swagger-ui.html
+  api-docs:
+    path: /v3/api-docs
+  packages-to-scan: com.coinly.business
+knife4j:
+  enable: false
+  setting:
+    language: zh_cn

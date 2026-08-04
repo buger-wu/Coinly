@@ -10,9 +10,12 @@ import com.coinly.common.exception.BusinessException;
 import jakarta.validation.Valid;
 import org.springframework.web.bind.annotation.*;
 
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import java.time.LocalDateTime;
 import java.util.List;
 
+@Tag(name = "账本模块")
 @RestController
 @RequestMapping("/v1/books")
 public class BookController {
@@ -23,6 +26,7 @@ public class BookController {
         this.bookService = bookService;
     }
 
+    @Operation(summary = "创建账本")
     @PostMapping
     public CommonResponse<BookEntity> createBook(@Valid @RequestBody CreateBookRequest request) {
         Long userId = UserContext.getUserId();
@@ -38,6 +42,7 @@ public class BookController {
         return CommonResponse.success(book);
     }
 
+    @Operation(summary = "获取账本列表")
     @GetMapping
     public CommonResponse<List<BookEntity>> getBookList() {
         Long userId = UserContext.getUserId();
@@ -47,6 +52,7 @@ public class BookController {
         return CommonResponse.success(books);
     }
 
+    @Operation(summary = "获取账本详情")
     @GetMapping("/{id}")
     public CommonResponse<BookEntity> getBookById(@PathVariable Long id) {
         Long userId = UserContext.getUserId();
@@ -61,6 +67,7 @@ public class BookController {
         return CommonResponse.success(book);
     }
 
+    @Operation(summary = "编辑账本")
     @PutMapping("/{id}")
     public CommonResponse<Void> updateBook(@PathVariable Long id, @Valid @RequestBody UpdateBookRequest request) {
         Long userId = UserContext.getUserId();
@@ -85,6 +92,7 @@ public class BookController {
         return CommonResponse.success("修改成功", null);
     }
 
+    @Operation(summary = "删除账本")
     @DeleteMapping("/{id}")
     public CommonResponse<Void> deleteBook(@PathVariable Long id) {
         Long userId = UserContext.getUserId();

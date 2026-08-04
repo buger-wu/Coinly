@@ -10,9 +10,12 @@ import com.coinly.common.exception.BusinessException;
 import jakarta.validation.Valid;
 import org.springframework.web.bind.annotation.*;
 
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import java.time.LocalDateTime;
 import java.util.List;
 
+@Tag(name = "分类模块")
 @RestController
 @RequestMapping("/v1/categories")
 public class CategoryController {
@@ -23,6 +26,7 @@ public class CategoryController {
         this.categoryService = categoryService;
     }
 
+    @Operation(summary = "获取一级分类列表")
     @GetMapping
     public CommonResponse<List<CategoryEntity>> getCategoryList() {
         Long userId = UserContext.getUserId();
@@ -34,6 +38,7 @@ public class CategoryController {
         return CommonResponse.success(categories);
     }
 
+    @Operation(summary = "获取全部分类（含二级）")
     @GetMapping("/all")
     public CommonResponse<List<CategoryEntity>> getAllCategories() {
         Long userId = UserContext.getUserId();
@@ -44,6 +49,7 @@ public class CategoryController {
         return CommonResponse.success(categories);
     }
 
+    @Operation(summary = "新增分类")
     @PostMapping
     public CommonResponse<CategoryEntity> createCategory(@Valid @RequestBody CreateCategoryRequest request) {
         Long userId = UserContext.getUserId();
@@ -60,6 +66,7 @@ public class CategoryController {
         return CommonResponse.success(category);
     }
 
+    @Operation(summary = "编辑分类")
     @PutMapping("/{id}")
     public CommonResponse<Void> updateCategory(@PathVariable Long id, @Valid @RequestBody UpdateCategoryRequest request) {
         Long userId = UserContext.getUserId();
@@ -87,6 +94,7 @@ public class CategoryController {
         return CommonResponse.success("修改成功", null);
     }
 
+    @Operation(summary = "删除分类")
     @DeleteMapping("/{id}")
     public CommonResponse<Void> deleteCategory(@PathVariable Long id) {
         Long userId = UserContext.getUserId();

@@ -11,9 +11,12 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import java.util.List;
 import java.util.Map;
 
+@Tag(name = "统计模块")
 @RestController
 @RequestMapping("/v1/statistics")
 public class StatisticsController {
@@ -24,6 +27,7 @@ public class StatisticsController {
         this.statisticsService = statisticsService;
     }
 
+    @Operation(summary = "月度收支总览")
     @GetMapping("/monthly")
     public CommonResponse<MonthlySummaryDTO> getMonthlySummary(@RequestParam(required = false) Long bookId,
                                                                @RequestParam String month) {
@@ -32,6 +36,7 @@ public class StatisticsController {
         return CommonResponse.success(summary);
     }
 
+    @Operation(summary = "分类支出占比")
     @GetMapping("/category")
     public CommonResponse<List<CategoryStatDTO>> getCategoryStats(@RequestParam(required = false) Long bookId,
                                                                   @RequestParam String month) {
@@ -40,6 +45,7 @@ public class StatisticsController {
         return CommonResponse.success(stats);
     }
 
+    @Operation(summary = "年度收支趋势")
     @GetMapping("/yearly")
     public CommonResponse<List<Map<String, Object>>> getYearlyTrend(@RequestParam(required = false) Long bookId,
                                                                      @RequestParam String year) {
@@ -55,6 +61,7 @@ public class StatisticsController {
      * @param months 近几个月，默认6
      * @return 每月 month/income/expense，按月份正序
      */
+    @Operation(summary = "近N个月收支趋势")
     @GetMapping("/recent-trend")
     public CommonResponse<List<Map<String, Object>>> getRecentTrend(@RequestParam(required = false) Long bookId,
                                                                      @RequestParam(defaultValue = "6") int months) {
@@ -71,6 +78,7 @@ public class StatisticsController {
      *
      * @return 各账本余额列表
      */
+    @Operation(summary = "账本余额汇总")
     @GetMapping("/balances")
     public CommonResponse<List<TransactionMapper.BookBalanceDTO>> getBookBalances() {
         Long userId = UserContext.getUserId();

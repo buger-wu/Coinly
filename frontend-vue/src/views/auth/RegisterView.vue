@@ -63,8 +63,10 @@ import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import type { FormInstance } from 'element-plus'
 import request from '@/utils/request'
+import { useUserStore } from '@/stores/user'
 
 const router = useRouter()
+const userStore = useUserStore()
 const formRef = ref<FormInstance>()
 const loading = ref(false)
 
@@ -84,9 +86,17 @@ async function handleRegister() {
   await formRef.value?.validate()
   loading.value = true
   try {
-    await request.post('/v1/auth/register', form.value)
-    ElMessage.success('注册成功，请登录')
-    router.push('/login')
+    const res = await request.post('/v1/auth/register', form.value)
+    // 注册成功后后端直接返回 token，无需再登录
+    userStore.setToken(res.data.token)
+    userStore.setUserInfo({
+      id: res.data.id,
+      username: res.data.username,
+      nickname: res.data.nickname,
+      email: ''
+    })
+    ElMessage.success('注册成功')
+    router.push('/')
   } finally {
     loading.value = false
   }

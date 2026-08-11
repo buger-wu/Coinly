@@ -1,5 +1,6 @@
 package com.coinly.business.statistics.service.impl;
 
+import com.coinly.business.cache.StatisticsCacheService;
 import com.coinly.business.statistics.dto.CategoryStatDTO;
 import com.coinly.business.statistics.dto.MonthlySummaryDTO;
 import com.coinly.business.statistics.service.StatisticsService;
@@ -11,71 +12,67 @@ import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.time.Year;
 import java.time.YearMonth;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 
 /**
  * 统计 Service 实现。
- * 统计数据实时计算，不冗余存储余额，保证数据一致性。
+ * V7: 接入 Redis 缓存，月度/分类统计结果缓存 5 分钟，记账时自动清除。
  */
 @Service
 public class StatisticsServiceImpl implements StatisticsService {
 
     private final TransactionMapper transactionMapper;
+    private final StatisticsCacheService cacheService;
 
-    public StatisticsServiceImpl(TransactionMapper transactionMapper) {
+    public StatisticsServiceImpl(TransactionMapper transactionMapper, StatisticsCacheService cacheService) {
         this.transactionMapper = transactionMapper;
+        this.cacheService = cacheService;
     }
 
-    /**
-     * 月度收支总览。
-     *
-     * <p>统计指定月份（支持按账本筛选）的收入总额、支出总额、净收支。
-     *
-     * @param userId 当前用户 ID
-     * @param bookId 账本 ID，null 表示所有账本汇总
-     * @param month  月份，格式 yyyy-MM
-     * @return 收入、支出、净收支
-     */
     @Override
     public MonthlySummaryDTO getMonthlySummary(Long userId, Long bookId, String month) {
+        // 1. 查缓存
+        MonthlySummaryDTO cached = cacheService.getMonthlyStats(userId, bookId, month);
+        if (cached != null) {
+            return cached;
+        }
+
+        // 2. 缓存未命中，查数据库
         YearMonth yearMonth = YearMonth.parse(month);
         LocalDate startDate = yearMonth.atDay(1);
         LocalDate endDate = yearMonth.atEndOfMonth();
 
-        // type=1 收入，type=0 支出
         BigDecimal totalIncome = transactionMapper.sumByType(userId, bookId, 1, startDate, endDate);
         BigDecimal totalExpense = transactionMapper.sumByType(userId, bookId, 0, startDate, endDate);
 
-        return new MonthlySummaryDTO(totalIncome, totalExpense);
+        MonthlySummaryDTO result = new MonthlySummaryDTO(totalIncome, totalExpense);
+
+        // 3. 写入缓存
+        cacheService.cacheMonthlyStats(userId, bookId, month, result);
+
+        return result;
     }
 
-    /**
-     * 分类支出占比统计。
-     *
-     * @param userId 当前用户 ID
-     * @param bookId 账本 ID，null 表示所有账本汇总
-     * @param month  月份，格式 yyyy-MM
-     * @return 分类名称、金额、百分比列表（按金额倒序）
-     */
     @Override
     public List<CategoryStatDTO> getCategoryStats(Long userId, Long bookId, String month) {
+        // 1. 查缓存
+        List<CategoryStatDTO> cached = cacheService.getCategoryStats(userId, bookId, month);
+        if (cached != null) {
+            return cached;
+        }
+
+        // 2. 查数据库
         YearMonth yearMonth = YearMonth.parse(month);
         LocalDate startDate = yearMonth.atDay(1);
         LocalDate endDate = yearMonth.atEndOfMonth();
 
-        // 按分类分组求和（SQL 已按金额倒序）
         List<TransactionMapper.CategoryAmountDTO> rawData = transactionMapper.sumByCategory(userId, bookId, startDate, endDate);
 
-        // 计算总支出，用于算占比
         BigDecimal total = rawData.stream()
                 .map(TransactionMapper.CategoryAmountDTO::totalAmount)
-                .filter(a -> a != null)
+                .filter(Objects::nonNull)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
 
-        // 计算每个分类的占比
         List<CategoryStatDTO> result = new ArrayList<>();
         for (TransactionMapper.CategoryAmountDTO dto : rawData) {
             CategoryStatDTO stat = new CategoryStatDTO(dto.name(), dto.totalAmount());
@@ -84,6 +81,9 @@ public class StatisticsServiceImpl implements StatisticsService {
             }
             result.add(stat);
         }
+
+        // 3. 写入缓存
+        cacheService.cacheCategoryStats(userId, bookId, month, result);
 
         return result;
     }

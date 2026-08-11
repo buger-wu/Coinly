@@ -4,6 +4,7 @@ import com.coinly.business.book.dto.CreateBookRequest;
 import com.coinly.business.book.dto.UpdateBookRequest;
 import com.coinly.business.book.entity.BookEntity;
 import com.coinly.business.book.service.BookService;
+import com.coinly.business.transaction.mapper.TransactionMapper;
 import com.coinly.common.context.UserContext;
 import com.coinly.common.domain.CommonResponse;
 import com.coinly.common.exception.BusinessException;
@@ -21,9 +22,11 @@ import java.util.List;
 public class BookController {
 
     private final BookService bookService;
+    private final TransactionMapper transactionMapper;
 
-    public BookController(BookService bookService) {
+    public BookController(BookService bookService, TransactionMapper transactionMapper) {
         this.bookService = bookService;
+        this.transactionMapper = transactionMapper;
     }
 
     @Operation(summary = "创建账本")
@@ -103,6 +106,12 @@ public class BookController {
 
         if (book == null) {
             throw new BusinessException("账本不存在");
+        }
+
+        // 检查是否有关联交易
+        long txCount = transactionMapper.countByBook(id);
+        if (txCount > 0) {
+            throw new BusinessException("该账本下有 " + txCount + " 条交易记录，无法删除");
         }
 
         bookService.removeById(id);

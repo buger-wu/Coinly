@@ -1,6 +1,20 @@
 <template>
-  <div class="dashboard-view">
-    <!-- 顶部：本月总览卡片 -->
+  <div class="dashboard-view" v-loading="loading">
+    <!-- 月份选择栏 -->
+    <div class="month-bar">
+      <el-date-picker
+        v-model="currentMonth"
+        type="month"
+        format="YYYY年MM月"
+        value-format="YYYY-MM"
+        :clearable="false"
+        @change="handleMonthChange"
+        style="width: 160px"
+      />
+      <span class="month-label">{{ currentMonth }} 总览</span>
+    </div>
+
+    <!-- 顶部：月度总览卡片 -->
     <el-row :gutter="20" class="section">
       <el-col :span="8">
         <el-card class="stat-card" shadow="hover">
@@ -9,7 +23,7 @@
               <el-icon :size="28"><ArrowDown /></el-icon>
             </div>
             <div class="stat-info">
-              <div class="stat-label">本月收入</div>
+              <div class="stat-label">月度收入</div>
               <div class="stat-value income">¥ {{ formatMoney(monthlyData.totalIncome) }}</div>
             </div>
           </div>
@@ -22,7 +36,7 @@
               <el-icon :size="28"><ArrowUp /></el-icon>
             </div>
             <div class="stat-info">
-              <div class="stat-label">本月支出</div>
+              <div class="stat-label">月度支出</div>
               <div class="stat-value expense">¥ {{ formatMoney(monthlyData.totalExpense) }}</div>
             </div>
           </div>
@@ -35,7 +49,7 @@
               <el-icon :size="28"><Wallet /></el-icon>
             </div>
             <div class="stat-info">
-              <div class="stat-label">本月结余</div>
+              <div class="stat-label">月度结余</div>
               <div class="stat-value" :class="monthlyData.netIncome < 0 ? 'expense' : 'balance'">
                 ¥ {{ formatMoney(monthlyData.netIncome) }}
               </div>
@@ -107,14 +121,51 @@
         </el-card>
       </el-col>
     </el-row>
+
+    <!-- 最近流水 -->
+    <el-row :gutter="20" class="section">
+      <el-col :span="24">
+        <el-card shadow="never" class="section-card">
+          <template #header>
+            <div class="recent-header">
+              <span class="card-title">最近流水</span>
+              <el-button link type="primary" @click="router.push('/books')">查看全部</el-button>
+            </div>
+          </template>
+          <el-table :data="recentTransactions" stripe style="width: 100%">
+            <el-table-column prop="transactionDate" label="日期" width="120" align="center" />
+            <el-table-column prop="type" label="类型" width="100" align="center">
+              <template #default="{ row }">
+                <el-tag :type="row.type === 0 ? 'danger' : 'success'" effect="light" round>
+                  {{ row.type === 0 ? '⬇ 支出' : '⬆ 收入' }}
+                </el-tag>
+              </template>
+            </el-table-column>
+            <el-table-column prop="categoryName" label="分类" width="140" align="center" />
+            <el-table-column prop="amount" label="金额" width="140" align="right">
+              <template #default="{ row }">
+                <span class="amount-text" :class="row.type === 0 ? 'expense' : 'income'">
+                  {{ row.type === 0 ? '-' : '+' }}¥{{ formatMoney(row.amount) }}
+                </span>
+              </template>
+            </el-table-column>
+            <el-table-column prop="remark" label="备注" min-width="200" show-overflow-tooltip />
+            <template #empty><el-empty description="暂无交易记录" /></template>
+          </el-table>
+        </el-card>
+      </el-col>
+    </el-row>
   </div>
 </template>
 
 <script setup lang="ts">
 import { ref, onMounted, onBeforeUnmount, nextTick } from 'vue'
+import { useRouter } from 'vue-router'
 import * as echarts from 'echarts'
 import { ArrowDown, ArrowUp, Wallet } from '@element-plus/icons-vue'
 import request from '@/utils/request'
+
+const router = useRouter()
 
 interface MonthlyData {
   totalIncome: number
@@ -141,15 +192,26 @@ interface CategoryItem {
   percentage: number
 }
 
-const currentMonth = (() => {
+interface RecentTransaction {
+  id: number
+  type: number
+  categoryName: string
+  amount: number
+  transactionDate: string
+  remark: string
+}
+
+const currentMonth = ref((() => {
   const now = new Date()
   const year = now.getFullYear()
   const month = String(now.getMonth() + 1).padStart(2, '0')
   return `${year}-${month}`
-})()
+})())
 
 const monthlyData = ref<MonthlyData>({ totalIncome: 0, totalExpense: 0, netIncome: 0 })
 const balances = ref<BookBalance[]>([])
+const recentTransactions = ref<RecentTransaction[]>([])
+const loading = ref(false)
 const trendChartRef = ref<HTMLElement>()
 const categoryChartRef = ref<HTMLElement>()
 
@@ -164,48 +226,78 @@ const formatMoney = (value: number) => {
 }
 
 const fetchMonthlyData = async () => {
+  loading.value = true
   try {
-    const data = await request.get<any, MonthlyData>('/v1/statistics/monthly', {
-      params: { month: currentMonth }
+    const res: any = await request.get('/v1/statistics/monthly', {
+      params: { month: currentMonth.value }
     })
-    monthlyData.value = data
+    monthlyData.value = res.data || {}
   } catch {
     /* 使用默认值 */
+  } finally {
+    loading.value = false
   }
 }
 
 const fetchBalances = async () => {
+  loading.value = true
   try {
-    const data = await request.get<any, BookBalance[]>('/v1/statistics/balances')
-    balances.value = data || []
+    const res: any = await request.get('/v1/statistics/balances')
+    balances.value = res.data || []
   } catch {
     /* 使用默认空数组 */
+  } finally {
+    loading.value = false
   }
 }
 
 const fetchTrend = async () => {
+  loading.value = true
   try {
-    const data = await request.get<any, TrendItem[]>('/v1/statistics/recent-trend', {
+    const res: any = await request.get('/v1/statistics/recent-trend', {
       params: { months: 6 }
     })
     await nextTick()
-    initTrendChart(data || [])
+    initTrendChart(res.data || [])
   } catch {
     await nextTick()
     initTrendChart([])
+  } finally {
+    loading.value = false
   }
 }
 
 const fetchCategory = async () => {
+  loading.value = true
   try {
-    const data = await request.get<any, CategoryItem[]>('/v1/statistics/category', {
-      params: { month: currentMonth }
+    const res: any = await request.get('/v1/statistics/category', {
+      params: { month: currentMonth.value }
     })
     await nextTick()
-    initCategoryChart(data || [])
+    initCategoryChart(res.data || [])
   } catch {
     await nextTick()
     initCategoryChart([])
+  } finally {
+    loading.value = false
+  }
+}
+
+const fetchRecentTransactions = async () => {
+  loading.value = true
+  try {
+    const booksRes: any = await request.get('/v1/books')
+    const books = booksRes.data || []
+    if (books.length === 0) return
+    const firstBookId = books[0].id
+    const res: any = await request.get(`/v1/books/${firstBookId}/transactions`, {
+      params: { page: 1, size: 5 }
+    })
+    recentTransactions.value = (res.data.records || []).slice(0, 5)
+  } catch {
+    recentTransactions.value = []
+  } finally {
+    loading.value = false
   }
 }
 
@@ -335,12 +427,20 @@ const handleResize = () => {
   categoryChart?.resize()
 }
 
+const handleMonthChange = async () => {
+  await Promise.all([
+    fetchMonthlyData(),
+    fetchCategory()
+  ])
+}
+
 onMounted(async () => {
   await Promise.all([
     fetchMonthlyData(),
     fetchBalances(),
     fetchTrend(),
-    fetchCategory()
+    fetchCategory(),
+    fetchRecentTransactions()
   ])
   window.addEventListener('resize', handleResize)
 })
@@ -358,6 +458,23 @@ onBeforeUnmount(() => {
 .dashboard-view {
   max-width: 1400px;
   margin: 0 auto;
+}
+
+.month-bar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 20px;
+  padding: 12px 20px;
+  background: #fff;
+  border-radius: 8px;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+}
+
+.month-label {
+  font-size: 16px;
+  font-weight: 600;
+  color: #303133;
 }
 
 .section {
@@ -470,5 +587,23 @@ onBeforeUnmount(() => {
 
 .detail-value {
   font-weight: 500;
+}
+
+.recent-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.amount-text {
+  font-weight: 600;
+}
+
+.amount-text.expense {
+  color: #f56c6c;
+}
+
+.amount-text.income {
+  color: #67c23a;
 }
 </style>

@@ -4,6 +4,7 @@ import com.coinly.business.category.dto.CreateCategoryRequest;
 import com.coinly.business.category.dto.UpdateCategoryRequest;
 import com.coinly.business.category.entity.CategoryEntity;
 import com.coinly.business.category.service.CategoryService;
+import com.coinly.business.transaction.mapper.TransactionMapper;
 import com.coinly.common.context.UserContext;
 import com.coinly.common.domain.CommonResponse;
 import com.coinly.common.exception.BusinessException;
@@ -21,9 +22,11 @@ import java.util.List;
 public class CategoryController {
 
     private final CategoryService categoryService;
+    private final TransactionMapper transactionMapper;
 
-    public CategoryController(CategoryService categoryService) {
+    public CategoryController(CategoryService categoryService, TransactionMapper transactionMapper) {
         this.categoryService = categoryService;
+        this.transactionMapper = transactionMapper;
     }
 
     @Operation(summary = "获取一级分类列表")
@@ -105,6 +108,12 @@ public class CategoryController {
 
         if (category == null) {
             throw new BusinessException("分类不存在");
+        }
+
+        // 检查是否有关联交易
+        long txCount = transactionMapper.countByCategory(id);
+        if (txCount > 0) {
+            throw new BusinessException("该分类下有 " + txCount + " 条交易记录，无法删除");
         }
 
         categoryService.removeById(id);

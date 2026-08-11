@@ -1,6 +1,7 @@
 package com.coinly.business.transaction.entity;
 
 import com.baomidou.mybatisplus.annotation.IdType;
+import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableId;
 import com.baomidou.mybatisplus.annotation.TableLogic;
 import com.baomidou.mybatisplus.annotation.TableName;
@@ -37,4 +38,8 @@ public class TransactionEntity {
     private LocalDateTime createTime;
 
     private LocalDateTime updateTime;
+
+    /** 分类名称，非数据库字段，查询时联表填充 */
+    @TableField(exist = false)
+    private String categoryName;
 }

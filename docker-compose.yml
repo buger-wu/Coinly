@@ -1,0 +1,159 @@
+# ============================================================
+# Coinly 全栈 Docker Compose 配置
+# 一键启动：docker-compose up -d
+# 一键停止：docker-compose down
+# 一键重建：docker-compose up -d --build
+#
+# 数据说明：
+# - MySQL 数据持久化到命名卷 mysql_data，容器重建不会丢失
+# - schema.sql 只在首次启动且数据目录为空时执行一次
+# - 如需重新初始化，先 docker-compose down -v 再 up
+# ============================================================
+
+services:
+  # ---- MySQL ----
+  mysql:
+    image: mysql:8.0
+    container_name: coinly-mysql
+    restart: unless-stopped
+    command: >
+      --character-set-server=utf8mb4
+      --collation-server=utf8mb4_unicode_ci
+      --default-authentication-plugin=mysql_native_password
+      --character-set-client-handshake=FALSE
+      --init-connect='SET NAMES utf8mb4'
+    environment:
+      MYSQL_ROOT_PASSWORD: "123456"
+      MYSQL_DATABASE: coinly
+      TZ: Asia/Shanghai
+    ports:
+      - "3307:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+      - ./backend-java/docs/schema.sql:/docker-entrypoint-initdb.d/01-schema.sql:ro
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-uroot", "-p123456"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # ---- Redis ----
+  redis:
+    image: redis:7-alpine
+    container_name: coinly-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # ---- RabbitMQ ----
+  rabbitmq:
+    image: rabbitmq:3-management
+    container_name: coinly-rabbitmq
+    restart: unless-stopped
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "check_running"]
+      interval: 15s
+      timeout: 10s
+      retries: 5
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # ---- Backend (Spring Boot) ----
+  backend:
+    build:
+      context: ./backend-java
+      dockerfile: Dockerfile
+    container_name: coinly-backend
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    environment:
+      TZ: Asia/Shanghai
+      LANG: C.UTF-8
+      LC_ALL: C.UTF-8
+      # V9: 敏感配置通过环境变量传入（支持 .env 文件覆盖）
+      DB_HOST: mysql
+      DB_PORT: "3306"
+      DB_NAME: coinly
+      DB_USERNAME: root
+      DB_PASSWORD: ${DB_PASSWORD:-123456}
+      REDIS_HOST: redis
+      REDIS_PORT: "6379"
+      REDIS_PASSWORD: ${REDIS_PASSWORD:-}
+      MQ_HOST: rabbitmq
+      MQ_PORT: "5672"
+      MQ_USERNAME: ${MQ_USERNAME:-guest}
+      MQ_PASSWORD: ${MQ_PASSWORD:-guest}
+      JWT_SECRET_KEY: ${JWT_SECRET_KEY:-coinly-secret-key-for-jwt-token-generation-2024}
+    healthcheck:
+      test: ["CMD-SHELL", "java -version 2>&1 | head -1 || exit 1"]
+      interval: 15s
+      timeout: 10s
+      retries: 5
+      start_period: 40s
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # ---- Frontend (Vue3 + Nginx) ----
+  frontend:
+    build:
+      context: ./frontend-vue
+      dockerfile: Dockerfile
+    container_name: coinly-frontend
+    restart: unless-stopped
+    ports:
+      - "8088:80"
+    depends_on:
+      backend:
+        condition: service_started
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://127.0.0.1:80"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+volumes:
+  mysql_data:
+  redis_data:
+  rabbitmq_data:

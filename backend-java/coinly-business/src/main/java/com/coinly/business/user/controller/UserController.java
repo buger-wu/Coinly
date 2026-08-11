@@ -2,6 +2,7 @@ package com.coinly.business.user.controller;
 
 import com.coinly.business.user.dto.UpdatePasswordRequest;
 import com.coinly.business.user.dto.UpdateProfileRequest;
+import com.coinly.business.user.dto.UserProfileDTO;
 import com.coinly.business.user.entity.UserEntity;
 import com.coinly.business.user.service.UserService;
 import com.coinly.common.context.UserContext;
@@ -30,13 +31,18 @@ public class UserController {
 
     @Operation(summary = "获取个人信息")
     @GetMapping("/profile")
-    public CommonResponse<UserEntity> getProfile() {
+    public CommonResponse<UserProfileDTO> getProfile() {
         Long userId = UserContext.getUserId();
         UserEntity user = userService.getById(userId);
         if (user == null) {
             throw new BusinessException("用户不存在");
         }
-        return CommonResponse.success(user);
+        UserProfileDTO dto = new UserProfileDTO();
+        dto.setId(user.getId());
+        dto.setUsername(user.getUsername());
+        dto.setNickname(user.getNickname());
+        dto.setEmail(user.getEmail());
+        return CommonResponse.success(dto);
     }
 
     @Operation(summary = "修改基本信息")

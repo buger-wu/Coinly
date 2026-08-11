@@ -1,5 +1,5 @@
 <template>
-  <div class="profile">
+  <div class="profile" v-loading="loading">
     <el-card>
       <template #header>
         <div style="font-weight: bold">个人信息</div>
@@ -31,6 +31,7 @@ import request from '@/utils/request'
 const userStore = useUserStore()
 const formRef = ref<FormInstance>()
 const submitting = ref(false)
+const loading = ref(false)
 
 const form = ref({
   username: '',
@@ -44,8 +45,15 @@ const rules = {
 }
 
 async function fetchProfile() {
-  const res: any = await request.get('/v1/user/profile')
-  form.value = res.data
+  loading.value = true
+  try {
+    const res: any = await request.get('/v1/user/profile')
+    form.value = res.data || {}
+  } catch (error) {
+    console.error('获取用户信息失败:', error)
+  } finally {
+    loading.value = false
+  }
 }
 
 async function handleSubmit() {

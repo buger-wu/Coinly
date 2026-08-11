@@ -92,4 +92,46 @@ public interface TransactionMapper extends BaseMapper<TransactionEntity> {
      * @param totalExpense 总支出
      */
     record BookBalanceDTO(Long bookId, String bookName, BigDecimal totalIncome, BigDecimal totalExpense) {}
+
+    /**
+     * 按指定分类汇总支出金额（用于预算计算）。
+     *
+     * @param userId    用户 ID
+     * @param categoryId 分类 ID
+     * @param startDate 起始日期
+     * @param endDate   结束日期
+     * @return 金额合计，无数据时为 null
+     */
+    /**
+     * 按指定分类汇总支出金额（用于预算计算，支持含子分类）。
+     *
+     * @param userId      用户 ID
+     * @param categoryIds 分类 ID 列表（含父分类+子分类）
+     * @param startDate   起始日期
+     * @param endDate     结束日期
+     * @return 金额合计，无数据时为 null
+     */
+    @Select("<script>" +
+            "SELECT SUM(amount) FROM biz_transaction " +
+            "WHERE user_id = #{userId} AND type = 0 AND deleted = 0 " +
+            "AND transaction_date BETWEEN #{startDate} AND #{endDate} " +
+            "AND category_id IN " +
+            "<foreach item='id' collection='categoryIds' open='(' separator=',' close=')'>#{id}</foreach>" +
+            "</script>")
+    BigDecimal sumExpenseByCategories(@Param("userId") Long userId,
+                                      @Param("categoryIds") List<Long> categoryIds,
+                                      @Param("startDate") LocalDate startDate,
+                                      @Param("endDate") LocalDate endDate);
+
+    /**
+     * 统计账本下的交易数量（用于删除前检查）。
+     */
+    @Select("SELECT COUNT(*) FROM biz_transaction WHERE book_id = #{bookId} AND deleted = 0")
+    long countByBook(@Param("bookId") Long bookId);
+
+    /**
+     * 统计分类下的交易数量（用于删除前检查）。
+     */
+    @Select("SELECT COUNT(*) FROM biz_transaction WHERE category_id = #{categoryId} AND deleted = 0")
+    long countByCategory(@Param("categoryId") Long categoryId);
 }

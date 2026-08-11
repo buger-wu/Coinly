@@ -21,6 +21,14 @@
           <el-icon><Notebook /></el-icon>
           <template #title>账本管理</template>
         </el-menu-item>
+        <el-menu-item index="/categories">
+          <el-icon><Collection /></el-icon>
+          <template #title>分类管理</template>
+        </el-menu-item>
+        <el-menu-item index="/budget">
+          <el-icon><PieChart /></el-icon>
+          <template #title>预算管理</template>
+        </el-menu-item>
         <el-menu-item index="/statistics">
           <el-icon><TrendCharts /></el-icon>
           <template #title>收支统计</template>
@@ -41,15 +49,17 @@
           </el-icon>
         </div>
         <div class="header-right">
-          <el-dropdown>
+          <el-dropdown @command="handleUserCommand">
             <span class="user-info">
               <el-avatar :size="32" icon="UserFilled" />
-              <span class="username">用户</span>
+              <span class="username">{{ userStore.userInfo?.nickname || userStore.userInfo?.username || '用户' }}</span>
               <el-icon><ArrowDown /></el-icon>
             </span>
             <template #dropdown>
               <el-dropdown-menu>
-                <el-dropdown-item>退出登录</el-dropdown-item>
+                <el-dropdown-item command="/profile">个人信息</el-dropdown-item>
+                <el-dropdown-item command="/password">修改密码</el-dropdown-item>
+                <el-dropdown-item divided command="logout">退出登录</el-dropdown-item>
               </el-dropdown-menu>
             </template>
           </el-dropdown>
@@ -65,21 +75,37 @@
 
 <script setup lang="ts">
 import { ref, computed } from 'vue'
-import { useRoute } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
+import { ElMessage } from 'element-plus'
 import {
   Wallet,
   DataLine,
   Notebook,
   TrendCharts,
+  Collection,
+  PieChart,
   Fold,
   Expand,
   ArrowDown
 } from '@element-plus/icons-vue'
+import { useUserStore } from '@/stores/user'
 
 const route = useRoute()
+const router = useRouter()
+const userStore = useUserStore()
 const isCollapse = ref(false)
 
 const activeMenu = computed(() => route.path)
+
+async function handleUserCommand(command: string) {
+  if (command === 'logout') {
+    await userStore.logout()
+    ElMessage.success('已退出登录')
+    router.push('/login')
+  } else {
+    router.push(command)
+  }
+}
 </script>
 
 <style scoped>

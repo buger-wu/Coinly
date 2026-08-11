@@ -1,6 +1,7 @@
 package com.coinly.common.exception;
 
 import com.coinly.common.domain.CommonResponse;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.validation.FieldError;
@@ -26,15 +27,18 @@ import java.util.stream.Collectors;
  * @see BusinessException
  * @see CommonResponse
  */
+@Slf4j
 @RestControllerAdvice
 public class GlobalExceptionHandler {
 
     /**
-     * 处理业务异常：返回 HTTP 400 + 业务 code + 错误信息。
+     * 处理业务异常：根据业务 code 返回对应 HTTP 状态码 + 错误信息。
+     * 401 未授权返回 HTTP 401，其余业务异常返回 HTTP 400。
      */
     @ExceptionHandler(BusinessException.class)
     public ResponseEntity<CommonResponse<Void>> handleBusinessException(BusinessException e) {
-        return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+        HttpStatus status = e.getCode() == 401 ? HttpStatus.UNAUTHORIZED : HttpStatus.BAD_REQUEST;
+        return ResponseEntity.status(status)
                 .body(CommonResponse.fail(e.getCode(), e.getMessage()));
     }
 
@@ -56,6 +60,7 @@ public class GlobalExceptionHandler {
      */
     @ExceptionHandler(Exception.class)
     public ResponseEntity<CommonResponse<Void>> handleException(Exception e) {
+        log.error("未捕获异常", e);
         return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                 .body(CommonResponse.fail(500, "服务器内部错误"));
     }

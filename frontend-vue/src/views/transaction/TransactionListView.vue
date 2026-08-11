@@ -4,9 +4,10 @@
       <div class="header-title">
         <el-icon :size="24" color="#409eff"><List /></el-icon>
         <span>交易记录</span>
+        <el-tag v-if="currentBookName" type="info" effect="plain" size="large">{{ currentBookName }}</el-tag>
       </div>
       <div class="header-actions">
-        <el-button :icon="Download" @click="handleExport" :disabled="transactions.length === 0">导出 CSV</el-button>
+        <el-button :icon="Download" @click="handleExport" :disabled="transactions.length === 0">导出 Excel</el-button>
         <el-button type="primary" :icon="Plus" @click="handleCreate">记一笔</el-button>
       </div>
     </div>
@@ -93,6 +94,11 @@
 
     <el-dialog :title="dialogTitle" v-model="dialogVisible" width="540px" :close-on-click-modal="false">
       <el-form :model="form" :rules="rules" ref="formRef" label-width="80px" label-position="top">
+        <el-form-item label="所属账本" prop="bookId">
+          <el-select v-model="form.bookId" placeholder="请选择账本" style="width: 100%" :disabled="!!form.id">
+            <el-option v-for="book in books" :key="book.id" :label="book.name" :value="book.id" />
+          </el-select>
+        </el-form-item>
         <el-form-item label="交易类型" prop="type">
           <el-radio-group v-model="form.type" size="large">
             <el-radio-button :value="0">
@@ -147,18 +153,25 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
-import { useRoute } from 'vue-router'
+import { ref, computed, onMounted, watch } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox, type FormInstance } from 'element-plus'
 import { Plus, Edit, Delete, Search, RefreshLeft, List, Top, Bottom, Download } from '@element-plus/icons-vue'
 import request from '@/utils/request'
 
 const route = useRoute()
-const bookId = route.params.bookId
+const router = useRouter()
+const bookId = ref(String(route.params.bookId))
+
+watch(() => route.params.bookId, (newBookId) => {
+  bookId.value = String(newBookId)
+  pagination.value.page = 1
+  fetchTransactions()
+})
 
 interface Transaction {
   id: number
-  type: string
+  type: number
   categoryId: number
   categoryName: string
   amount: number
@@ -173,8 +186,14 @@ interface Category {
   parentId: number | null
 }
 
+interface Book {
+  id: number
+  name: string
+}
+
 const transactions = ref<Transaction[]>([])
 const categories = ref<Category[]>([])
+const books = ref<Book[]>([])
 const loading = ref(false)
 const dialogVisible = ref(false)
 const dialogTitle = ref('')
@@ -195,6 +214,7 @@ const queryForm = ref({
 
 const form = ref({
   id: 0,
+  bookId: Number(bookId.value),
   type: 0,
   categoryId: null as number | null,
   amount: null as number | null,
@@ -203,6 +223,7 @@ const form = ref({
 })
 
 const rules = {
+  bookId: [{ required: true, message: '请选择账本', trigger: 'change' }],
   type: [{ required: true, message: '请选择类型', trigger: 'change' }],
   categoryId: [{ required: true, message: '请选择分类', trigger: 'change' }],
   amount: [
@@ -219,26 +240,46 @@ async function fetchTransactions() {
       page: pagination.value.page,
       size: pagination.value.size
     }
-    if (queryForm.value.type) params.type = queryForm.value.type
+    if (queryForm.value.type !== null && queryForm.value.type !== undefined) params.type = queryForm.value.type
     if (queryForm.value.categoryId) params.categoryId = queryForm.value.categoryId
     if (queryForm.value.dateRange?.length === 2) {
       params.startDate = queryForm.value.dateRange[0]
       params.endDate = queryForm.value.dateRange[1]
     }
-    const res: any = await request.get(`/v1/books/${bookId}/transactions`, { params })
-    transactions.value = res.data.records
+    const res: any = await request.get(`/v1/books/${bookId.value}/transactions`, { params })
+    transactions.value = res.data.records || []
     pagination.value.total = res.data.total
+  } catch (error) {
+    console.error('获取交易记录失败:', error)
   } finally {
     loading.value = false
   }
 }
 
 async function fetchCategories() {
-  const res: any = await request.get('/v1/categories/all')
-  categories.value = res.data
+  try {
+    const res: any = await request.get('/v1/categories/all')
+    categories.value = res.data || []
+  } catch (error) {
+    console.error('获取分类失败:', error)
+  }
+}
+
+async function fetchBooks() {
+  try {
+    const res: any = await request.get('/v1/books')
+    books.value = res.data || []
+  } catch (error) {
+    console.error('获取账本失败:', error)
+  }
 }
 
 const parentCategories = computed(() => categories.value.filter(c => c.parentId === null || c.parentId === undefined))
+
+const currentBookName = computed(() => {
+  const book = books.value.find(b => String(b.id) === bookId.value)
+  return book?.name
+})
 
 function getChildren(parentId: number) {
   return categories.value.filter(c => c.parentId === parentId)
@@ -248,6 +289,7 @@ function handleCreate() {
   dialogTitle.value = '记一笔'
   form.value = {
     id: 0,
+    bookId: Number(bookId.value),
     type: 0,
     categoryId: null,
     amount: null,
@@ -261,6 +303,7 @@ function handleEdit(transaction: Transaction) {
   dialogTitle.value = '编辑交易'
   form.value = {
     id: transaction.id,
+    bookId: Number(bookId.value),
     type: transaction.type,
     categoryId: transaction.categoryId,
     amount: transaction.amount,
@@ -274,23 +317,44 @@ async function handleSubmit() {
   await formRef.value?.validate()
   submitting.value = true
   try {
+    const targetBookId = form.value.bookId
     if (form.value.id) {
-      await request.put(`/v1/books/${bookId}/transactions/${form.value.id}`, form.value)
+      await request.put(`/v1/books/${targetBookId}/transactions/${form.value.id}`, {
+        type: form.value.type,
+        categoryId: form.value.categoryId,
+        amount: form.value.amount,
+        transactionDate: form.value.transactionDate,
+        remark: form.value.remark
+      })
       ElMessage.success('修改成功')
     } else {
-      await request.post(`/v1/books/${bookId}/transactions`, form.value)
+      await request.post(`/v1/books/${targetBookId}/transactions`, {
+        type: form.value.type,
+        categoryId: form.value.categoryId,
+        amount: form.value.amount,
+        transactionDate: form.value.transactionDate,
+        remark: form.value.remark
+      })
       ElMessage.success('记账成功')
     }
     dialogVisible.value = false
-    fetchTransactions()
+    if (targetBookId !== Number(bookId.value)) {
+      router.push(`/books/${targetBookId}/transactions`)
+    } else {
+      fetchTransactions()
+    }
   } finally {
     submitting.value = false
   }
 }
 
 async function handleDelete(id: number) {
-  await ElMessageBox.confirm('确定要删除此交易记录吗？', '提示', { type: 'warning' })
-  await request.delete(`/v1/books/${bookId}/transactions/${id}`)
+  try {
+    await ElMessageBox.confirm('确定要删除此交易记录吗？', '提示', { type: 'warning' })
+  } catch {
+    return
+  }
+  await request.delete(`/v1/books/${bookId.value}/transactions/${id}`)
   ElMessage.success('删除成功')
   fetchTransactions()
 }
@@ -305,29 +369,37 @@ function resetQuery() {
   fetchTransactions()
 }
 
-function handleExport() {
-  const headers = ['日期', '类型', '分类', '金额', '备注']
-  const rows = transactions.value.map(t => [
-    t.transactionDate,
-    t.type === 0 ? '支出' : '收入',
-    t.categoryName || '',
-    t.amount,
-    (t.remark || '').replace(/,/g, '，')
-  ])
-
-  const BOM = '\uFEFF'
-  const csv = BOM + [headers.join(','), ...rows.map(r => r.join(','))].join('\n')
-  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' })
-  const url = URL.createObjectURL(blob)
-  const link = document.createElement('a')
-  link.href = url
-  link.download = `交易记录_${new Date().toISOString().slice(0, 10)}.csv`
-  link.click()
-  URL.revokeObjectURL(url)
-  ElMessage.success('导出成功')
+async function handleExport() {
+  try {
+    const params: any = {}
+    if (queryForm.value.type !== null && queryForm.value.type !== undefined) params.type = queryForm.value.type
+    if (queryForm.value.categoryId) params.categoryId = queryForm.value.categoryId
+    if (queryForm.value.dateRange?.length === 2) {
+      params.startDate = queryForm.value.dateRange[0]
+      params.endDate = queryForm.value.dateRange[1]
+    }
+    const res: any = await request.get(`/v1/books/${bookId.value}/transactions/export`, {
+      params,
+      responseType: 'blob'
+    })
+    const blob = new Blob([res.data], {
+      type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+    })
+    const url = URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.href = url
+    link.download = `交易记录_${new Date().toISOString().slice(0, 10)}.xlsx`
+    link.click()
+    URL.revokeObjectURL(url)
+    ElMessage.success('导出成功')
+  } catch (error) {
+    console.error('导出失败:', error)
+    ElMessage.error('导出失败')
+  }
 }
 
 onMounted(() => {
+  fetchBooks()
   fetchCategories()
   fetchTransactions()
 })
@@ -343,7 +415,7 @@ onMounted(() => {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-bottom: 16px;
+  margin-bottom: 20px;
   padding: 20px;
   background: #fff;
   border-radius: 8px;

@@ -91,7 +91,9 @@ async function fetchBooks() {
   loading.value = true
   try {
     const res: any = await request.get('/v1/books')
-    books.value = res.data
+    books.value = res.data || []
+  } catch (error) {
+    console.error('获取账本失败:', error)
   } finally {
     loading.value = false
   }
@@ -134,9 +136,13 @@ async function handleSubmit() {
 }
 
 async function handleDelete(id: number) {
-  await ElMessageBox.confirm('确定要删除此账本吗？', '提示', {
-    type: 'warning'
-  })
+  try {
+    await ElMessageBox.confirm('确定要删除此账本吗？', '提示', {
+      type: 'warning'
+    })
+  } catch {
+    return
+  }
   await request.delete(`/v1/books/${id}`)
   ElMessage.success('删除成功')
   fetchBooks()

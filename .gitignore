@@ -16,6 +16,8 @@ node_modules/
 dist/
 dist-ssr/
 *.local
+vite.config.js
+vite.config.d.ts
 
 # ---- IDE 配置 ----
 .idea/
